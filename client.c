@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <strings.h>
+#include <string.h>
 #include <netdb.h> // gethostbyname()
 #include <stdlib.h>
 #include <unistd.h>
@@ -14,23 +15,16 @@
 
 void recvmsgs(void *);
 void sendmsgs(void *);
-void header(char*, char*);
+void header(char *, char *);
+int recvb(int, void *, long int, FILE *);
 
 int main(int argc, char **argv)
 {
 	struct sockaddr_in server_addr;
 	struct hostent *host;
 	int *sockfd = (int *)malloc(sizeof(int));
-	long int sendbyte, recvbyte, length;
-	char *msg = (char *)malloc(100 * sizeof(char)),
-	*method = (char *)malloc(6 * sizeof(char)),
-	*index = (char *)malloc(30 * sizeof(char)),
-	*user_agent = (char *)malloc(50 * sizeof(char)),
-	*host_req = (char *)malloc(32 * sizeof(char)),
-	*content_type = (char *)malloc(30 * sizeof(char)),
-	*range = (char *)malloc(20 * sizeof(char)),
-	*connection = (char *)malloc(15 * sizeof(char)),
-	*body = (char *)malloc(102400 * sizeof(char));
+	long int sendbyte, recvbyte, length, ranges = 0;
+	char *msg = (char *)malloc(2000 * sizeof(char)), *body = (char *)malloc(1024000 * sizeof(char));
 	char *ip = SERVERIP;
 	unsigned int port = SERVERPORT;
 	FILE *fp;
@@ -55,7 +49,7 @@ int main(int argc, char **argv)
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(port);
 	server_addr.sin_addr = *((struct in_addr*)host->h_addr);
-	bzero(&server_addr.sin_zero, sizeof(struct sockaddr));
+	bzero(&server_addr.sin_zero, 8);
 	if ((*sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	{
 		fprintf(stderr, "Socket create fail.\n");
@@ -68,58 +62,26 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	puts("Connect success.");
-
-	header(method, "GET");
-	header(index, "/favicon.ico");
-	header(user_agent, "C/Socket");
-	header(host_req, "127.0.0.1");
-	header(content_type, "text/html");
-	header(range, "0-");
-	header(connection, "Keep-Alive");
-	sprintf(msg, "%s %s HTTP/1.1\n"
-		"Content-Type: %s\n"
-		"User-Agent: %s\n"
-		"Host: %s\n"
-		"Range: bytes=%s\n"
-		"Connection: %s\n\n",
-		method,
-		index,
-		content_type,
-		user_agent,
-		host_req,
-		range,
-		connection
-	);
-	printf("enter: %s\33[1;31m-\33[0m\nstrlen: %zd\n", msg, strlen(msg));
+	strcpy(msg, "GET /FlowerDance.flac HTTP/1.1\n");
+	strcat(msg, "Content-Type: text/html\n");
+	strcat(msg, "Host: dark-1258224056.cos.ap-chengdu.myqcloud.com\n");
+	strcat(msg, "Range: 0-30000\n");
+	strcat(msg, "Origin: https://www.aliyundrive.com/\n");
+	strcat(msg, "Referer: https://www.aliyundrive.com/\n\n");
+	printf("\33[1;33mRequest header\33[0m: %s\33[1;31m----\33[0m\nrequest header \33[1;33msize: %zd\33[0m\n", msg, strlen(msg));
 	if ((sendbyte = send(*sockfd, msg, strlen(msg), 0)) < 0)
 	{
-		fprintf(stderr, "Msg send fail.");
+		fprintf(stderr, "Msg send fail.\n");
 		exit(-1);
 	}
 	printf("Send bytes: %ld\n", sendbyte);
-	fp = fopen("icon.ico", "a+");
-	while ((recvbyte = recv(*sockfd, body, RESPONSESIZE - 1, 0)) > 0)
+	fp = fopen("icon.ico", "w");
+	// ranges = atoi(range);
+	printf("\33[31mRanges:\33[0m %ld\n", ranges);
+	if ((recvbyte = recvb(*sockfd, body, ranges, fp)) > 0)
 	{
-		static unsigned long int recvbytes = 0;
-		recvbytes += recvbyte;
-		char *content_t, *pre;
-		pre = body;
-		if ((content_t = strstr(body, "Content-Length:")))
-		{
-			if ((content_t = strchr(content_t, ' ')))
-			{
-				content_t += 1;
-				length = atoi(content_t);
-				if ((body = strstr(body, "\r\n\r\n")))
-					body += 4;
-				recvbyte += (pre - body);
-			}
-		}
-		printf("Response: \33[1;36m%ld\33[0m bytes and allow \33[1;35m%ld\33[0m bytes\n", recvbyte, recvbytes);
-		if ((fwrite(body, sizeof(char), recvbyte, fp)) < 0)
-			fprintf(stderr, "Write error.");
-		if (recvbytes > length)
-			break;
+		printf("All: %ld Bytes\tDownloaded: %ld Bytes\n", recvbyte, (ranges == 0) ? recvbyte : ranges);
+		// if ((ranges) || (ranges < ))
 	}
 
 	// pthread_create(&id, NULL, (void *)recvmsgs, (void *)sockfd);
@@ -128,17 +90,39 @@ int main(int argc, char **argv)
 	// pthread_join(id, NULL);
 	fclose(fp);
 	close(*sockfd);
+	free(msg);
 	free(sockfd);
 	free(body);
-	free(method);
-	free(index);
-	free(user_agent);
-	free(host_req);
-	free(content_type);
-	free(range);
-	free(connection);
 	puts("\33[1;32mDone.\33[0m");
 	return 0;
+}
+
+int recvb(int __sockfd, void *buf, long int range, FILE *fp/* , long int length */)
+{
+	long int recvbyte, length;
+	while ((recvbyte = recv(__sockfd, buf, RESPONSESIZE - 1, 0)) > 0)
+	{
+		static unsigned long int recvbytes = 0;
+		recvbytes += recvbyte;
+		char *content_t, *pre = (char *)buf;
+		if ((content_t = strstr(buf, "Content-Range:")) || (content_t = strstr(buf, "Content-Length:")))
+		{
+			if ((content_t = strchr(content_t, '/')) || (content_t = strchr(content_t, ' ')))
+			{
+				length = atoi(content_t + 1);
+				(range == 0) ? range = length : range;
+				if ((pre = strstr(buf, "\r\n\r\n")))
+					recvbyte += ((char *)buf - (pre += 4));
+				puts(buf);
+			}
+		}
+		printf("Response: \33[1;36m%ld\33[0m bytes and allow \33[1;35m%ld\33[0m bytes. Length: %ld\n", recvbyte, recvbytes, length);
+		if ((fwrite(pre, sizeof(char), recvbyte, fp)) < 0)
+			fprintf(stderr, "Write error.");
+		if (range < recvbytes)
+			break;
+	}
+	return length;
 }
 
 void header(char *type, char *arg)
