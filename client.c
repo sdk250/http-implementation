@@ -65,7 +65,8 @@ int main(int argc, char **argv)
 	strcpy(msg, "GET /FlowerDance.flac HTTP/1.1\n");
 	strcat(msg, "Content-Type: text/html\n");
 	strcat(msg, "Host: dark-1258224056.cos.ap-chengdu.myqcloud.com\n");
-	strcat(msg, "Range: 0-30000\n");
+	strcat(msg, "Range: bytes=0-\n");
+	strcat(msg, "Connection: Keep-Alive\n");
 	strcat(msg, "Origin: https://www.aliyundrive.com/\n");
 	strcat(msg, "Referer: https://www.aliyundrive.com/\n\n");
 	printf("\33[1;33mRequest header\33[0m: %s\33[1;31m----\33[0m\nrequest header \33[1;33msize: %zd\33[0m\n", msg, strlen(msg));
