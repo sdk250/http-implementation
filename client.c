@@ -5,7 +5,6 @@
 #include <sys/socket.h>
 #include <strings.h>
 #include <string.h>
-#include <netdb.h> // gethostbyname()
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
