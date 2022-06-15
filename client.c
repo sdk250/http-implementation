@@ -1,6 +1,7 @@
-// Version 1.0
+// Version 2.0
 #include <stdio.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <strings.h>
 #include <string.h>
@@ -9,9 +10,10 @@
 #include <unistd.h>
 #include <pthread.h>
 #define SERVERPORT 8080
-#define BUFFERSIZE 100
-#define RESPONSESIZE 102400
-#define SERVERIP "127.0.0.1"
+#define BUFFERSIZE 2000
+#define RESPONSESIZE 1024000
+#define ERRORMSG "\33[1;31mError: \33[0m"
+#define SERVERIP "0.0.0.0"
 
 void recvmsgs(void *);
 void sendmsgs(void *);
@@ -21,63 +23,59 @@ int recvb(int, void *, long int, FILE *);
 int main(int argc, char **argv)
 {
 	struct sockaddr_in server_addr;
-	struct hostent *host;
 	int *sockfd = (int *)malloc(sizeof(int));
 	long int sendbyte, recvbyte, length, ranges = 0;
-	char *msg = (char *)malloc(2000 * sizeof(char)), *body = (char *)malloc(1024000 * sizeof(char));
-	char *ip = SERVERIP;
+	char *msg = (char *)malloc(BUFFERSIZE * sizeof(char)), *body = (char *)malloc(RESPONSESIZE * sizeof(char));
+	struct in_addr ip;
 	unsigned int port = SERVERPORT;
 	FILE *fp;
 	pthread_t id;
 
 	if (argc < 2)
 	{
-		if ((host = gethostbyname(SERVERIP)) == NULL)
+		if ((ip.s_addr = inet_addr(SERVERIP)) < 0 )
 		{
-			fprintf(stderr, "Get host error.\n");
+			fprintf(stderr, "%sGet %s error.\n", ERRORMSG, inet_ntoa(ip));
 			exit(EXIT_FAILURE);
 		}
-		puts("Get host success.");
 	} else if (argc >= 2) {
-		ip = argv[1];
-		host = gethostbyname(argv[1]);
+		ip.s_addr = inet_addr(argv[1]);
 		port = atoi(argv[2]);
 	} else {
 		fprintf(stderr, "Argc Error.\n");
 		exit(EXIT_FAILURE);
 	}
-	server_addr.sin_family = AF_INET;
+	puts("Get host success.");
+	server_addr.sin_family = AF_INET; /* IPV4 */
 	server_addr.sin_port = htons(port);
-	server_addr.sin_addr = *((struct in_addr*)host->h_addr);
-	bzero(&server_addr.sin_zero, 8);
+	server_addr.sin_addr.s_addr = ip.s_addr;
+	bzero(&server_addr.sin_zero, sizeof(struct sockaddr));
 	if ((*sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	{
-		fprintf(stderr, "Socket create fail.\n");
+		fprintf(stderr, "%sSocket create fail. socket: %d\n", ERRORMSG, *sockfd);
 		exit(EXIT_FAILURE);
 	}
 	puts("Socket create success.");
 	if (connect(*sockfd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr)) < 0)
 	{
-		fprintf(stderr, "Connect to %s fail.\n", ip);
+		fprintf(stderr, "%sConnect to %s fail.\n", ERRORMSG, inet_ntoa(ip));
 		exit(EXIT_FAILURE);
 	}
 	puts("Connect success.");
-	strcpy(msg, "GET /FlowerDance.flac HTTP/1.1\n");
+	strcpy(msg, "GET /favicon.ico HTTP/1.1\n");
 	strcat(msg, "Content-Type: text/html\n");
-	strcat(msg, "Host: dark-1258224056.cos.ap-chengdu.myqcloud.com\n");
+	strcat(msg, "Host: 106.13.205.72\n");
 	strcat(msg, "Range: bytes=0-\n");
-	strcat(msg, "Connection: Keep-Alive\n");
 	strcat(msg, "Origin: https://www.aliyundrive.com/\n");
 	strcat(msg, "Referer: https://www.aliyundrive.com/\n\n");
 	printf("\33[1;33mRequest header\33[0m: %s\33[1;31m----\33[0m\nrequest header \33[1;33msize: %zd\33[0m\n", msg, strlen(msg));
 	if ((sendbyte = send(*sockfd, msg, strlen(msg), 0)) < 0)
 	{
-		fprintf(stderr, "Msg send fail.\n");
+		fprintf(stderr, "%sMsg send fail.\n", ERRORMSG);
 		exit(-1);
 	}
 	printf("Send bytes: %ld\n", sendbyte);
 	fp = fopen("icon.ico", "w");
-	// ranges = atoi(range);
 	printf("\33[31mRanges:\33[0m %ld\n", ranges);
 	if ((recvbyte = recvb(*sockfd, body, ranges, fp)) > 0)
 	{
@@ -119,7 +117,7 @@ int recvb(int __sockfd, void *buf, long int range, FILE *fp/* , long int length 
 		}
 		printf("Response: \33[1;36m%ld\33[0m bytes and allow \33[1;35m%ld\33[0m bytes. Length: %ld\n", recvbyte, recvbytes, length);
 		if ((fwrite(pre, sizeof(char), recvbyte, fp)) < 0)
-			fprintf(stderr, "Write error.");
+			fprintf(stderr, "%sWrite error.", ERRORMSG);
 		if (range < recvbytes)
 			break;
 	}
