@@ -64,10 +64,10 @@ int main(int argc, char **argv) {
 	printf("Listening on IP: %s:%u....\n", inet_ntoa(server_addr.sin_addr), port);
 
 	if ((client_fd = accept(sockfd, (struct sockaddr *)&client_addr[0], (socklen_t *)&sin_size)) < 0) {
-		fprintf(stderr, "%sAccpet \'%s\' fail.\n", ERRORMSG, inet_ntoa(client_addr[0].sin_addr));
+		fprintf(stderr, "%sAccpet \'%s:%u\' fail.\n", ERRORMSG, inet_ntoa(client_addr[0].sin_addr), port);
 		exit(EXIT_FAILURE);
 	}
-	printf("Accept \'%s\' success!\n", inet_ntoa(client_addr[0].sin_addr));
+	printf("Accept \'%s:%u\' success!\n", inet_ntoa(client_addr[0].sin_addr), port);
 
 	if (pthread_create(&id, NULL, (void *)recvmsgs, (void *)&client_fd) != 0) {
 		fprintf(stderr, "%sCreate \'recvmsg\' function fail\n", ERRORMSG);
