@@ -74,6 +74,7 @@ int main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 		j++;
+		pthread_join(id, NULL);
 		// fprintf(stderr, "%sAccpet \'%s:%u\' fail.\n", ERRORMSG, inet_ntoa(client_addr[0].sin_addr), port);
 		// exit(EXIT_FAILURE);
 	}
@@ -81,7 +82,7 @@ int main(int argc, char **argv) {
 
 	
 
-	pthread_join(id, NULL);
+	
 	close(sockfd);
 	close(client_fd);
 	puts("\33[1;32mDone.\33[0m");
