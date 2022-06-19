@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
 	struct sockaddr_in server_addr, client_addr[BACKLOG];
 	struct hostent *host;
 	char *ip = SERVERIP;
-	int sockfd, client_fd, port = SERVERPORT, i, sin_size = sizeof(struct sockaddr);
+	int sockfd, client_fd[BACKLOG], port = SERVERPORT, i, sin_size = sizeof(struct sockaddr), j = 0;
 	pthread_t id;
 
 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -63,20 +63,23 @@ int main(int argc, char **argv) {
 	}
 	printf("Listening on IP: %s:%u....\n", inet_ntoa(server_addr.sin_addr), port);
 
-	if ((client_fd = accept(sockfd, (struct sockaddr *)&client_addr[0], (socklen_t *)&sin_size)) < 0) {
-		fprintf(stderr, "%sAccpet \'%s:%u\' fail.\n", ERRORMSG, inet_ntoa(client_addr[0].sin_addr), port);
-		exit(EXIT_FAILURE);
+	while ((client_fd[j] = accept(sockfd, (struct sockaddr *)&client_addr[j], (socklen_t *)&sin_size)) > 0) {
+		printf("Accept \'%s:%u\' success!\n", inet_ntoa(client_addr[j].sin_addr), port);
+		if (pthread_create(&id, NULL, (void *)recvmsgs, (void *)&client_fd[j]) != 0) {
+			fprintf(stderr, "%sCreate \'recvmsg\' function fail\n", ERRORMSG);
+			exit(EXIT_FAILURE);
+		}
+		if (pthread_create(&id, NULL, (void *)sendmsgs, (void *)&client_fd[j]) != 0) {
+			fprintf(stderr, "%sCreate \'sendmsg\' function fail.\n", ERRORMSG);
+			exit(EXIT_FAILURE);
+		}
+		j++;
+		// fprintf(stderr, "%sAccpet \'%s:%u\' fail.\n", ERRORMSG, inet_ntoa(client_addr[0].sin_addr), port);
+		// exit(EXIT_FAILURE);
 	}
-	printf("Accept \'%s:%u\' success!\n", inet_ntoa(client_addr[0].sin_addr), port);
+	
 
-	if (pthread_create(&id, NULL, (void *)recvmsgs, (void *)&client_fd) != 0) {
-		fprintf(stderr, "%sCreate \'recvmsg\' function fail\n", ERRORMSG);
-		exit(EXIT_FAILURE);
-	}
-	if (pthread_create(&id, NULL, (void *)sendmsgs, (void *)&client_fd) != 0) {
-		fprintf(stderr, "%sCreate \'sendmsg\' function fail.\n", ERRORMSG);
-		exit(EXIT_FAILURE);
-	}
+	
 
 	pthread_join(id, NULL);
 	close(sockfd);
